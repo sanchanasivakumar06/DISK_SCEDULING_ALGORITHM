@@ -5,14 +5,15 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-#define MAX 100 //Maximum number of disk requests
+#define MAX 100   // Maximum number of disk requests
 
 int requests[MAX], n = 0, head, disk_size;
 char direction[10];
 sem_t sem;
 
+/* Correct comparator for qsort */
 int cmpfunc(const void *a, const void *b) {
-    return ((int)a - (int)b);  //qsort() to sort integers in ascending order
+    return (*(int*)a - *(int*)b);
 }
 
 void plot_sequence(int sequence[], int count) {
@@ -28,6 +29,7 @@ void plot_sequence(int sequence[], int count) {
 
     for (int i = 0; i < count; i++) {
         int pos = sequence[i];
+
         for (int j = 0; j <= disk_size; j += 10)
             printf((pos >= j && pos < j + 10) ? "  ● " : "    ");
         printf("\n");
@@ -38,11 +40,14 @@ void plot_sequence(int sequence[], int count) {
     }
 }
 
+/* ---------------- FCFS ---------------- */
 void* fcfs(void* arg) {
     sem_wait(&sem);
+
     int total = 0;
     int sequence[n + 1];
     int local_head = head;
+
     sequence[0] = local_head;
 
     for (int i = 0; i < n; i++) {
@@ -54,26 +59,36 @@ void* fcfs(void* arg) {
     printf("\nFCFS Algorithm:\n");
     plot_sequence(sequence, n + 1);
     printf("Total Head Movement: %d\n", total);
+
     sem_post(&sem);
     return NULL;
 }
 
+/* ---------------- SSTF ---------------- */
 void* sstf(void* arg) {
     sem_wait(&sem);
-    int visited[n], total = 0;
+
+    int visited[n];
+    int total = 0;
     int sequence[n + 1];
     int local_head = head;
+
     sequence[0] = local_head;
-    for (int i = 0; i < n; i++) visited[i] = 0;
+
+    for (int i = 0; i < n; i++)
+        visited[i] = 0;
 
     for (int i = 0; i < n; i++) {
-        int min = 1e9, index = -1;
+        int min = 1000000000;
+        int index = -1;
+
         for (int j = 0; j < n; j++) {
             if (!visited[j] && abs(requests[j] - local_head) < min) {
                 min = abs(requests[j] - local_head);
                 index = j;
             }
         }
+
         total += min;
         local_head = requests[index];
         visited[index] = 1;
@@ -83,20 +98,29 @@ void* sstf(void* arg) {
     printf("\nSSTF Algorithm:\n");
     plot_sequence(sequence, n + 1);
     printf("Total Head Movement: %d\n", total);
+
     sem_post(&sem);
     return NULL;
 }
 
+/* ---------------- SCAN ---------------- */
 void* scan(void* arg) {
     sem_wait(&sem);
-    int left[n], right[n], l = 0, r = 0, total = 0;
-    int sequence[n + 3], idx = 0;
+
+    int left[n], right[n];
+    int l = 0, r = 0;
+    int total = 0;
+    int sequence[n + 3];
+    int idx = 0;
     int local_head = head;
+
     sequence[idx++] = local_head;
 
     for (int i = 0; i < n; i++) {
-        if (requests[i] < local_head) left[l++] = requests[i];
-        else right[r++] = requests[i];
+        if (requests[i] < local_head)
+            left[l++] = requests[i];
+        else
+            right[r++] = requests[i];
     }
 
     qsort(left, l, sizeof(int), cmpfunc);
@@ -108,26 +132,32 @@ void* scan(void* arg) {
             local_head = left[i];
             sequence[idx++] = local_head;
         }
+
         total += local_head;
         local_head = 0;
         sequence[idx++] = local_head;
+
         for (int i = 0; i < r; i++) {
             total += abs(local_head - right[i]);
             local_head = right[i];
             sequence[idx++] = local_head;
         }
-    } else {
+    }
+    else {
         for (int i = 0; i < r; i++) {
             total += abs(local_head - right[i]);
             local_head = right[i];
             sequence[idx++] = local_head;
         }
+
         total += abs(local_head - (disk_size - 1));
         local_head = disk_size - 1;
         sequence[idx++] = local_head;
+
         total += local_head;
         local_head = 0;
         sequence[idx++] = local_head;
+
         for (int i = 0; i < l; i++) {
             total += abs(local_head - left[i]);
             local_head = left[i];
@@ -138,20 +168,29 @@ void* scan(void* arg) {
     printf("\nSCAN Algorithm (%s):\n", direction);
     plot_sequence(sequence, idx);
     printf("Total Head Movement: %d\n", total);
+
     sem_post(&sem);
     return NULL;
 }
 
+/* ---------------- CSCAN ---------------- */
 void* cscan(void* arg) {
     sem_wait(&sem);
-    int left[n], right[n], l = 0, r = 0, total = 0;
-    int sequence[n + 4], idx = 0;
+
+    int left[n], right[n];
+    int l = 0, r = 0;
+    int total = 0;
+    int sequence[n + 4];
+    int idx = 0;
     int local_head = head;
+
     sequence[idx++] = local_head;
 
     for (int i = 0; i < n; i++) {
-        if (requests[i] < local_head) left[l++] = requests[i];
-        else right[r++] = requests[i];
+        if (requests[i] < local_head)
+            left[l++] = requests[i];
+        else
+            right[r++] = requests[i];
     }
 
     qsort(left, l, sizeof(int), cmpfunc);
@@ -180,20 +219,29 @@ void* cscan(void* arg) {
     printf("\nCSCAN Algorithm:\n");
     plot_sequence(sequence, idx);
     printf("Total Head Movement: %d\n", total);
+
     sem_post(&sem);
     return NULL;
 }
 
+/* ---------------- LOOK ---------------- */
 void* look(void* arg) {
     sem_wait(&sem);
-    int left[n], right[n], l = 0, r = 0, total = 0;
-    int sequence[n + 2], idx = 0;
+
+    int left[n], right[n];
+    int l = 0, r = 0;
+    int total = 0;
+    int sequence[n + 2];
+    int idx = 0;
     int local_head = head;
+
     sequence[idx++] = local_head;
 
     for (int i = 0; i < n; i++) {
-        if (requests[i] < local_head) left[l++] = requests[i];
-        else right[r++] = requests[i];
+        if (requests[i] < local_head)
+            left[l++] = requests[i];
+        else
+            right[r++] = requests[i];
     }
 
     qsort(left, l, sizeof(int), cmpfunc);
@@ -205,17 +253,20 @@ void* look(void* arg) {
             local_head = left[i];
             sequence[idx++] = local_head;
         }
+
         for (int i = 0; i < r; i++) {
             total += abs(local_head - right[i]);
             local_head = right[i];
             sequence[idx++] = local_head;
         }
-    } else {
+    }
+    else {
         for (int i = 0; i < r; i++) {
             total += abs(local_head - right[i]);
             local_head = right[i];
             sequence[idx++] = local_head;
         }
+
         for (int i = l - 1; i >= 0; i--) {
             total += abs(local_head - left[i]);
             local_head = left[i];
@@ -226,20 +277,29 @@ void* look(void* arg) {
     printf("\nLOOK Algorithm (%s):\n", direction);
     plot_sequence(sequence, idx);
     printf("Total Head Movement: %d\n", total);
+
     sem_post(&sem);
     return NULL;
 }
 
+/* ---------------- CLOOK ---------------- */
 void* clook(void* arg) {
     sem_wait(&sem);
-    int left[n], right[n], l = 0, r = 0, total = 0;
-    int sequence[n + 2], idx = 0;
+
+    int left[n], right[n];
+    int l = 0, r = 0;
+    int total = 0;
+    int sequence[n + 2];
+    int idx = 0;
     int local_head = head;
+
     sequence[idx++] = local_head;
 
     for (int i = 0; i < n; i++) {
-        if (requests[i] < local_head) left[l++] = requests[i];
-        else right[r++] = requests[i];
+        if (requests[i] < local_head)
+            left[l++] = requests[i];
+        else
+            right[r++] = requests[i];
     }
 
     qsort(left, l, sizeof(int), cmpfunc);
@@ -266,11 +326,14 @@ void* clook(void* arg) {
     printf("\nCLOOK Algorithm:\n");
     plot_sequence(sequence, idx);
     printf("Total Head Movement: %d\n", total);
+
     sem_post(&sem);
     return NULL;
 }
 
+/* ---------------- MAIN ---------------- */
 int main() {
+
     printf("Enter disk size: ");
     scanf("%d", &disk_size);
 
